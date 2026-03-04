@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Мониторинг серверов Minecraft</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #0f0c29, #302b63, #24243e);
+            color: #fff;
+            min-height: 100vh;
+            padding: 30px 20px;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(90deg, #00f260, #0575e6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .subtitle {
+            text-align: center;
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .servers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .server-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 16px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .server-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .server-card.online {
+            border-left: 4px solid #4CAF50;
+        }
+
+        .server-card.offline {
+            border-left: 4px solid #f44336;
+        }
+
+        .server-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .server-ip {
+            color: #aaa;
+            font-size: 0.9em;
+            margin-bottom: 15px;
+        }
+
+        .server-ip span {
+            cursor: pointer;
+            background: rgba(255,255,255,0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        .server-ip span:hover {
+            background: rgba(255,255,255,0.2);
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.05);
+        }
+
+        .info-label {
+            color: #999;
+        }
+
+        .info-value {
+            font-weight: bold;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85em;
+            font-weight: bold;
+        }
+
+        .status-online {
+            background: rgba(76, 175, 80, 0.2);
+            color: #4CAF50;
+        }
+
+        .status-offline {
+            background: rgba(244, 67, 54, 0.2);
+            color: #f44336;
+        }
+
+        .players-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .players-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #00f260, #0575e6);
+            border-radius: 4px;
+            transition: width 0.5s;
+        }
+
+        .motd {
+            margin-top: 15px;
+            padding: 10px;
+            background: rgba(0,0,0,0.3);
+            border-radius: 8px;
+            font-size: 0.9em;
+            color: #ccc;
+            text-align: center;
+        }
+
+        .last-update {
+            text-align: center;
+            color: #555;
+            margin-top: 30px;
+            font-size: 0.85em;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 50px;
+            color: #888;
+            font-size: 1.2em;
+        }
+
+        @media (max-width: 600px) {
+            h1 { font-size: 1.8em; }
+            .servers-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <h1>⚡️ Server Monitor</h1>
+    <p class="subtitle">Мониторинг серверов в реальном времени</p>
+    <div id="servers" class="servers-grid">
+        <div class="loading">⏳ Загрузка серверов...</div>
+    </div>
+    <p class="last-update" id="lastUpdate"></p>
+
+    <script>
+        // ===== ДОБАВЛЯЙТЕ СВОИ СЕРВЕРЫ СЮДА =====
+        const servers = [
+            { ip: 'play.hypixel.net', name: 'Hypixel', description: 'Крупнейший сервер' },
+            { ip: 'mc.funtime.su', name: 'FunTime', description: 'Русский сервер' },
+            // { ip: 'ваш.сервер.ip', name: 'Название', description: 'Описание' },
+        ];
+        // =========================================
+
+        async function checkServer(server) {
+            try {
+                const response = await fetch(`https://api.mcsrvstat.us/2/${server.ip}`);
+                const data = await response.json();
+                const online = data.online || false;
+                const players = data.players ? data.players.online : 0;
+                const maxPlayers = data.players ? data.players.max : 0;
+                const version = data.version || 'N/A';
+                const motd = data.motd ? data.motd.clean.join(' ') : '';
+                const fillPercent = maxPlayers > 0 ? (players / maxPlayers) * 100 : 0;
+
+                return `
+                    <div class="server-card ${online ? 'online' : 'offline'}">
+                        <div class="server-name">${server.name}</div>
+                        <div class="server-ip"><span onclick="copyIP('${server.ip}')" title="Нажми чтобы скопировать">${server.ip} 📋</span></div>
+                        <div class="info-row">
+                            <span class="info-label">Статус</span>
+                            <span class="status-badge ${online ? 'status-online' : 'status-offline'}">
+                                ${online ? '🟢 Онлайн' : '🔴 Оффлайн'}
+                            </span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Игроки</span>
+                            <span class="info-value">${players} / ${maxPlayers}</span>
+                        </div>
+                        <div class="info-row">
+                            <span class="info-label">Версия</span>
+                            <span class="info-value">${version}</span>
+                        </div>
+                        ${server.description ? `<div class="info-row"><span class="info-label">Описание</span><span class="info-value">${server.description}</span></div>` : ''}
+                        <div class="players-bar"><div class="players-fill" style="width: ${fillPercent}%"></div></div>
+                        ${motd ? `<div class="motd">${motd}</div>` : ''}
+                    </div>
+                `;
+            } catch (error) {
+                return `
+                    <div class="server-card offline">
+                        <div class="server-name">${server.name}</div>
+                        <div class="server-ip">${server.ip}</div>
+                        <div class="info-row">
+                            <span class="info-label">Статус</span>
+                            <span class="status-badge status-offline">❌ Ошибка</span>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function copyIP(ip) {
+            navigator.clipboard.writeText(ip);
+            alert('IP скопирован: ' + ip);
+        }
+
+        async function loadServers() {
+            const container = document.getElementById('servers');
+            const results = await Promise.all(servers.map(s => checkServer(s)));
+            container.innerHTML = results.join('');
+            document.getElementById('lastUpdate').textContent =
+                'Последнее обновление: ' + new Date().toLocaleTimeString('ru-RU');
+        }
+
+        loadServers();
+        setInterval(loadServers, 30000);
+    </script>
+</body>
+</html>
+
