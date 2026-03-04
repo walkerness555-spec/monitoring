@@ -1,0 +1,3 @@
+User-agent: *
+Allow: /
+Sitemap: https://walkerness555-spec.github.io/monitoring/sitemap.xml
